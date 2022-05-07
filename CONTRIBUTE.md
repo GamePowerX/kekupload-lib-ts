@@ -50,4 +50,5 @@ If you're finished implementing a feature and are confident sharing this code wi
 <br>
 
 ## Final words
+
 Its great if you decide to contribute to opensource but don't forget that you should keep your code readable and use language specific conventions.
