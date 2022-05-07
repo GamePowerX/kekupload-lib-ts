@@ -5,20 +5,22 @@ A library for [KekUpload server](https://oss.kotw.dev/kekupload-server) written 
 <br>
 
 ## License
+
 This project is licensed under the [Mit License](https://mit-license.org/)
 
 <hr>
 <br>
 
-
 ## Usage
 
 npm
+
 ```sh
 npm install kekupload-lib-ts
 ```
 
 yarn
+
 ```sh
 yarn add kekupload-lib-ts
 ```
@@ -27,4 +29,5 @@ yarn add kekupload-lib-ts
 <br>
 
 ## Contributing
+
 More information [here](https://oss.kotw.dev/kekupload-lib-ts/CONTRIBUTE).
