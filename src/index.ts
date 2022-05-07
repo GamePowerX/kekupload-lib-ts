@@ -210,6 +210,9 @@ export class FileUploader extends ChunkedUploader {
 
 	/**
 	 * Upload the file. You have to run {@link begin} first to initialize the stream.
+     * 
+     * @param file The file to upload
+     * @param on_progress A callback which will be called when the upload progressses
 	 *
 	 * @throws Throws an error if the stream is not initialized
 	 * @throws Throws an error if {@link cancel} was called
@@ -228,7 +231,7 @@ export class FileUploader extends ChunkedUploader {
 	 * console.log(id, hash);
 	 * ```
 	 */
-	async upload_file(file: File): Promise<void> {
+	async upload_file(file: File, on_progress: (progress: number)=>void): Promise<void> {
 		this.#uploading = true;
 
 		for (let i = 0; i < file.size; i += this.#read_size) {
@@ -253,6 +256,8 @@ export class FileUploader extends ChunkedUploader {
 
 						// Upload the chunk
 						await this.upload(chunk);
+
+                        on_progress((i + f) / file.size);
 
 						resolve(null);
 					}
@@ -302,6 +307,7 @@ export type FileUploaderQueuedJob = {
 	then: (value: { id: string; hash: string }) => void;
 	catch: (err: any) => void;
 	finally: () => void;
+    on_progress: (progress: number) => void;
 };
 
 export class FileUploaderQueued extends FileUploader {
@@ -349,7 +355,10 @@ export class FileUploaderQueued extends FileUploader {
 	 *     finally: () => {
 	 *         // Same as Promise::finally
 	 *         console.log("This will be executed even if there was an error");
-	 *     }
+	 *     },
+     *     on_progress: (progress) => {
+     *        console.log(`uploading: ${(progress*100).toFixed(1)}%`);
+     *     }
 	 * });
 	 * ```
 	 */
@@ -396,7 +405,7 @@ export class FileUploaderQueued extends FileUploader {
 				delete this.#jobs[job_id];
 
 				await this.begin(job.ext);
-				await this.upload_file(job.file);
+				await this.upload_file(job.file, job.on_progress);
 
 				try {
 					await this.finish().then(job.then).catch(job.catch);
