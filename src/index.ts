@@ -69,7 +69,7 @@ export class ChunkedUploader {
 	/**
 	 * Create a new ChunkedUploader.
 	 *
-	 * @param api The KekUploadAPI to use.
+	 * @param options The options passed to the constructor.
 	 *
 	 * ```typescript
 	 * // Create a new ChunkedUploader
@@ -177,13 +177,11 @@ export class ChunkedUploader {
 }
 
 export type FileUploaderOptions = ChunkedUploaderOptions & {
-	file: File;
 	read_size?: number;
 	chunk_size?: number;
 };
 
 export class FileUploader extends ChunkedUploader {
-	readonly #file: File;
 	readonly #read_size: number;
 	readonly #chunk_size: number;
 	#cancel?: () => void;
@@ -197,15 +195,13 @@ export class FileUploader extends ChunkedUploader {
 	 * ```typescript
 	 * // Create a new FileUploader
 	 * const uploader = new FileUploader({
-	 *     api: new KekUploadAPI("https://u.kotw.dev/api/"),
-	 *     file: file
+	 *     api: new KekUploadAPI("https://u.kotw.dev/api/")
 	 * });
 	 * ```
 	 */
 	constructor(options: FileUploaderOptions) {
 		super(options);
 
-		this.#file = options.file;
 		// Default 32 MiB
 		this.#read_size = options.read_size || 33554432;
 		// Default 2 MiB
@@ -223,7 +219,7 @@ export class FileUploader extends ChunkedUploader {
 	 * await uploader.begin("txt");
 	 *
 	 * // Upload the file
-	 * await uploader.uploadFile();
+	 * await uploader.uploadFile(file);
 	 *
 	 * // Finish the stream
 	 * const {id, hash} = await uploader.finish();
@@ -232,13 +228,13 @@ export class FileUploader extends ChunkedUploader {
 	 * console.log(id, hash);
 	 * ```
 	 */
-	async upload_file(): Promise<void> {
+	async upload_file(file: File): Promise<void> {
 		this.#uploading = true;
 
-		for (let i = 0; i < this.#file.size; i += this.#read_size) {
+		for (let i = 0; i < file.size; i += this.#read_size) {
 			await new Promise((resolve, reject) => {
 				// Take a slice of the file with size of our read_size
-				const slice = this.#file.slice(i, i + this.#read_size);
+				const slice = file.slice(i, i + this.#read_size);
 
 				const reader = new FileReader();
 				reader.onload = async (e) => {
@@ -247,7 +243,7 @@ export class FileUploader extends ChunkedUploader {
 					for (let f = 0; f < result.byteLength; f += this.#chunk_size) {
 						if (this.#cancel) {
 							await this.destroy().catch();
-							reject("Cancelled");
+							reject("CANCELLED");
 							this.#cancel();
 							return;
 						}
@@ -270,7 +266,7 @@ export class FileUploader extends ChunkedUploader {
 	}
 
 	/**
-	 * Upload the file. You have to run {@link begin} first to initialize the stream.
+	 * Cancel the file upload. You have to run {@link upload_file} first.
 	 *
 	 * @throws Throws an error if not uploading
 	 *
@@ -279,13 +275,14 @@ export class FileUploader extends ChunkedUploader {
 	 * await uploader.begin("txt");
 	 *
 	 * // Upload the file
-	 * await uploader.uploadFile();
+	 * uploader.uploadFile(file).catch(e => {
+	 *    if(e === "CANCELLED") console.log("Upload got canceled!");
+	 * });
 	 *
-	 * // Finish the stream
-	 * const {id, hash} = await uploader.finish();
-	 *
-	 * // Print out the id and hash of the uploaded file
-	 * console.log(id, hash);
+	 * setTimeout(() => {
+	 *    // Cancel the upload
+	 *    uploader.cancel();
+	 * }, 1000);
 	 * ```
 	 */
 	cancel(): Promise<void> {
@@ -297,140 +294,118 @@ export class FileUploader extends ChunkedUploader {
 	}
 }
 
-// export function none() {}
+export type FileUploaderQueuedOptions = FileUploaderOptions & {};
 
-// export type UploadJob = {
-// 	file: File;
-// 	extension: string;
-// 	on_start: () => void;
-// 	on_progress: (progress: number) => void;
-// 	on_complete: (id: string) => void;
-// 	on_error: (error: string) => void;
-// 	on_finally: () => void;
-// };
+export type FileUploaderQueuedJob = {
+	file: File;
+	ext: string;
+	then: (value: { id: string; hash: string }) => void;
+	catch: (err: any) => void;
+	finally: () => void;
+};
 
-// let queue: number[] = [];
-// let queue_index: number = 0;
-// let jobs: { [key: number]: UploadJob } = {};
+export class FileUploaderQueued extends FileUploader {
+	readonly #jobs: { [key: number]: FileUploaderQueuedJob } = {};
+	readonly #queue: number[] = [];
+	#queue_index: number = 0;
 
-// let running: number = 0;
-// let active: number = 0;
+	#running: number = 0;
+	#active: number = -1;
 
-// let cancel_callback: () => void;
+	/**
+	 * Create a new FileUploaderQueued.
+	 *
+	 * @param options The options passed to the constructor.
+	 *
+	 * ```typescript
+	 * // Create a new FileUploaderQueued
+	 * const uploader = new FileUploaderQueued({
+	 *     api: new KekUploadAPI("https://u.kotw.dev/api/")
+	 * });
+	 * ```
+	 */
+	constructor(options: FileUploaderQueuedOptions) {
+		super(options);
+	}
 
-// export function cancel(id: number, on_cancel: () => void) {
-// 	if (active === id) cancel_callback = on_cancel;
-// 	else {
-// 		queue = queue.filter(function (i) {
-// 			return i !== id;
-// 		});
-// 		delete jobs[id];
-// 		on_cancel();
-// 	}
-// }
+	/**
+	 * Add a job to the queue.
+	 *
+	 * @param job The job to add to the queue
+	 * @returns The job id which can be used to cancel the job
+	 *
+	 * ```typescript
+	 * // Add a job to the queue
+	 * const id = uploader.addJob({
+	 *     file: file,
+	 *     ext: "txt",
+	 *     then: ({id, hash}) => {
+	 *         console.log(id, hash);
+	 *     },
+	 *     catch: (e) => {
+	 *         if(e === "CANCELLED") console.log("Upload got canceled!");
+	 *         else console.err(e);
+	 *     },
+	 *     finally: () => {
+	 *         // Same as Promise::finally
+	 *         console.log("This will be executed even if there was an error");
+	 *     }
+	 * });
+	 * ```
+	 */
+	add_job(job: FileUploaderQueuedJob): number {
+		const id = this.#queue_index++;
+		this.#jobs[id] = job;
+		this.#queue.push(id);
 
-// export function upload(
-// 	file: File,
-// 	extension: string,
-// 	on_start: () => void = none,
-// 	on_progress: (progress: number) => void = none,
-// 	on_complete: (id: string) => void = none,
-// 	on_error: (error: string) => void = none,
-// 	on_finally: () => void = none
-// ): number {
-// 	let id = queue_index++;
-// 	jobs[id] = {
-// 		file,
-// 		extension,
-// 		on_start,
-// 		on_progress,
-// 		on_complete,
-// 		on_error,
-// 		on_finally
-// 	};
-// 	queue.push(id);
-// 	work();
-// 	return id;
-// }
+		this.#work();
 
-// export async function work() {
-// 	if (running++ === 0) {
-// 		while (queue.length > 0) {
-// 			let id = queue.shift();
-// 			active = id;
-// 			let job = jobs[id];
-// 			delete jobs[id];
-// 			await do_job(job);
-// 			active = null;
-// 		}
-// 		running = 0;
-// 	}
-// }
+		return id;
+	}
 
-// export async function do_job(job: UploadJob) {
-// 	job.on_start();
+	/**
+	 * Cancel a job which has been added to the queue.
+	 *
+	 * @throws Throws an error if the job with the given id is not in the queue
+	 *
+	 * @param job_id The job_id which you get by calling {@link add_job}
+	 *
+	 * ```typescript
+	 * // Cancel job
+	 * uploader.cancel_job(job_id);
+	 * ```
+	 */
+	async cancel_job(job_id: number): Promise<void> {
+		if (this.#active === job_id) {
+			await this.cancel();
+		} else {
+			if (!this.#jobs[job_id]) throw new Error("Job not found");
 
-// 	let file: File = job.file;
+			delete this.#jobs[job_id];
+			this.#queue.splice(this.#queue.indexOf(job_id), 1);
+		}
+	}
 
-// 	let extension: string = encodeURIComponent(job.extension);
+	async #work() {
+		// Check if it is not running
+		if (this.#running++ === 0) {
+			// Iterate over the entire queue
+			for (let job_id = this.#queue.shift(); job_id; job_id = this.#queue.shift()) {
+				this.#active = job_id;
+				const job = this.#jobs[job_id];
+				delete this.#jobs[job_id];
 
-// 	let hasher = CryptoJS.algo.SHA1.create();
+				await this.begin(job.ext);
+				await this.upload_file(job.file);
 
-// 	let stream: string = await api.create(extension);
+				try {
+					await this.finish().then(job.then).catch(job.catch);
+				} catch (ignored) {}
 
-// 	let running: boolean = true;
+				job.finally();
+			}
 
-// 	for (let i = 0; i < file.size && running; i += upload_file_chunk) {
-// 		await new Promise(function (resolve, reject) {
-// 			let slice = file.slice(i, i + upload_file_chunk);
-
-// 			let reader = new FileReader();
-// 			reader.onload = async function (e) {
-// 				let result = e.target.result as ArrayBuffer;
-// 				for (let f = 0; f < result.byteLength && running; f += upload_chunk) {
-// 					let success = false;
-
-// 					let chunk = result.slice(f, f + upload_chunk);
-// 					let chunk_hash = CryptoJS.SHA1(array_buffer_to_word_array(chunk)).toString();
-
-// 					while (!success) {
-// 						if (cancel_callback) {
-// 							running = false;
-// 							break;
-// 						}
-
-// 						try {
-// 							await api.upload(stream, chunk_hash, chunk);
-// 							success = true;
-
-// 							job.on_progress((i + f) / file.size);
-// 						} catch (e) {}
-// 					}
-
-// 					hasher.update(array_buffer_to_word_array(chunk));
-// 				}
-
-// 				resolve(null);
-// 			};
-
-// 			reader.readAsArrayBuffer(slice);
-// 		});
-// 	}
-
-// 	if (running) {
-// 		await api
-// 			.finish(stream, hasher.finalize().toString())
-// 			.then(job.on_complete)
-// 			.catch(job.on_error)
-// 			.finally(job.on_finally);
-// 	} else {
-// 		await api
-// 			.remove(stream)
-// 			.then(cancel_callback)
-// 			.catch(job.on_error)
-// 			.finally(function () {
-// 				cancel_callback = null;
-// 				job.on_finally();
-// 			});
-// 	}
-// }
+			this.#running = 0;
+		}
+	}
+}
