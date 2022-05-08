@@ -94,6 +94,8 @@ export class ChunkedUploader {
 	 * ```
 	 */
 	async begin(ext: string): Promise<void> {
+        // Reset the hasher to its initial state
+        this.hasher.reset();
 		this.stream = (await this.api.create(ext)).stream;
 	}
 
