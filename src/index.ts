@@ -1,6 +1,6 @@
 import CryptoJS from "crypto-js";
 
-export function array_buffer_to_word_array(ab: ArrayBuffer) {
+function array_buffer_to_word_array(ab: ArrayBuffer) {
 	let i8a = new Uint8Array(ab);
 	let a = [];
 	for (let i = 0; i < i8a.length; i += 4) {
