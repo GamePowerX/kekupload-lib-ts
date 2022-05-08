@@ -399,7 +399,8 @@ export class FileUploaderQueued extends FileUploader {
 
 	private async work() {
 		// Check if it is not running
-		if (this.running++ === 0) {
+        let should_run = this.running++;
+		if (should_run === 0) {
 			// Iterate over the entire queue 
 			while (this.queue.length > 0) {
 				this.active = this.queue.shift() as number;
