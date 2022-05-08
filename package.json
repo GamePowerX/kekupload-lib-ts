@@ -1,16 +1,40 @@
 {
 	"name": "kekupload-lib-ts",
 	"version": "0.0.0alpha0",
-	"description": "",
+	"description": "KekUpload library written in typescript.",
+	"main": "dist/index",
+	"typings": "dist/index",
+	"author": "KekOnTheWorld <kekontheworld@gmail.com>",
+	"license": "MIT",
 	"scripts": {
+		"prepublishOnly": "npm run compile",
+		"compile": "npm run clean && tsc -p .",
+		"watch": "tsc -w -p .",
+		"clean": "rm -rf dist",
 		"format": "prettier --ignore-path .gitignore --write --plugin-search-dir=. ."
 	},
 	"dependencies": {
 		"crypto-js": "^4.1.1",
-		"prettier": "^2.6.2",
-		"typescript": "^4.6.2"
+		"prettier": "^2.6.2"
 	},
 	"devDependencies": {
-		"@types/crypto-js": "^4.1.1"
-	}
+		"@types/crypto-js": "^4.1.1",
+		"typescript": "^2.9.2"
+	},
+	"bugs": {
+		"url": "https://github.com/KotwOSS/kekupload-lib-ts/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/KotwOSS/kekupload-lib-ts/issues.git"
+	},
+	"keywords": [
+		"kekupload",
+		"library",
+		"typescript"
+	],
+	"files": [
+		"dist/index.js",
+		"dist/index.d.ts"
+	]
 }
