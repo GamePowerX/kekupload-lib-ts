@@ -1,6 +1,6 @@
 import CryptoJS from "crypto-js";
 
-export function array_buffer_to_word_array(ab: ArrayBuffer) {
+function array_buffer_to_word_array(ab: ArrayBuffer) {
 	let i8a = new Uint8Array(ab);
 	let a = [];
 	for (let i = 0; i < i8a.length; i += 4) {
@@ -27,7 +27,7 @@ export class KekUploadAPI {
 		this.base = base;
 	}
 
-	async #req(method: HttpMethod, path: string, data: ArrayBuffer | null): Promise<any> {
+	async req(method: HttpMethod, path: string, data: ArrayBuffer | null): Promise<any> {
 		return new Promise((resolve, reject) => {
 			let xmlHttp = new XMLHttpRequest();
 			xmlHttp.onreadystatechange = function () {
@@ -41,19 +41,19 @@ export class KekUploadAPI {
 	}
 
 	async create(ext: string): Promise<{ stream: string }> {
-		return await this.#req("POST", `c/${ext}`, null);
+		return await this.req("POST", `c/${ext}`, null);
 	}
 
 	async upload(stream: string, hash: string, chunk: ArrayBuffer): Promise<{ success: boolean }> {
-		return await this.#req("POST", `u/${stream}/${hash}`, chunk);
+		return await this.req("POST", `u/${stream}/${hash}`, chunk);
 	}
 
 	async finish(stream: string, hash: string): Promise<{ id: string }> {
-		return await this.#req("POST", `f/${stream}/${hash}`, null);
+		return await this.req("POST", `f/${stream}/${hash}`, null);
 	}
 
 	async remove(stream: string): Promise<{ success: boolean }> {
-		return await this.#req("POST", `r/${stream}`, null);
+		return await this.req("POST", `r/${stream}`, null);
 	}
 }
 
@@ -62,9 +62,9 @@ export type ChunkedUploaderOptions = {
 };
 
 export class ChunkedUploader {
-	readonly #api: KekUploadAPI;
-	readonly #hasher;
-	#stream: string | undefined;
+	private readonly api: KekUploadAPI;
+	private readonly hasher: any;
+	private stream: string | undefined;
 
 	/**
 	 * Create a new ChunkedUploader.
@@ -79,8 +79,8 @@ export class ChunkedUploader {
 	 * ```
 	 */
 	constructor(options: ChunkedUploaderOptions) {
-		this.#hasher = CryptoJS.algo.SHA1.create();
-		this.#api = options.api;
+		this.hasher = CryptoJS.algo.SHA1.create();
+		this.api = options.api;
 	}
 
 	/**
@@ -94,7 +94,9 @@ export class ChunkedUploader {
 	 * ```
 	 */
 	async begin(ext: string): Promise<void> {
-		this.#stream = (await this.#api.create(ext)).stream;
+        // Reset the hasher to its initial state
+        this.hasher.reset();
+		this.stream = (await this.api.create(ext)).stream;
 	}
 
 	/**
@@ -119,16 +121,16 @@ export class ChunkedUploader {
 	 */
 	upload(chunk: ArrayBuffer): Promise<string> {
 		return new Promise(async (resolve, reject) => {
-			if (this.#stream === undefined) reject("Stream not initialized. Have you ran 'begin' yet?");
+			if (this.stream === undefined) reject("Stream not initialized. Have you ran 'begin' yet?");
 
 			const word_array = array_buffer_to_word_array(chunk);
 			const hash = CryptoJS.SHA1(word_array).toString();
-			this.#hasher.update(word_array);
+			this.hasher.update(word_array);
 
 			// Try uploading chunk until it succeeds
 			while (true) {
 				try {
-					await this.#api.upload(this.#stream as string, hash, chunk);
+					await this.api.upload(this.stream as string, hash, chunk);
 					break;
 				} catch (e) {}
 			}
@@ -149,11 +151,11 @@ export class ChunkedUploader {
 	 * ```
 	 */
 	async finish(): Promise<{ id: string; hash: string }> {
-		if (this.#stream === undefined)
+		if (this.stream === undefined)
 			throw new Error("Stream not initialized. Have you ran 'begin' yet?");
 
-		const hash = this.#hasher.finalize().toString();
-		const { id } = await this.#api.finish(this.#stream as string, hash);
+		const hash = this.hasher.finalize().toString();
+		const { id } = await this.api.finish(this.stream as string, hash);
 
 		return { id, hash };
 	}
@@ -169,10 +171,10 @@ export class ChunkedUploader {
 	 * ```
 	 */
 	async destroy(): Promise<void> {
-		if (this.#stream === undefined)
+		if (this.stream === undefined)
 			throw new Error("Stream not initialized. Have you ran 'begin' yet?");
 
-		await this.#api.remove(this.#stream as string);
+		await this.api.remove(this.stream as string);
 	}
 }
 
@@ -182,10 +184,10 @@ export type FileUploaderOptions = ChunkedUploaderOptions & {
 };
 
 export class FileUploader extends ChunkedUploader {
-	readonly #read_size: number;
-	readonly #chunk_size: number;
-	#cancel?: () => void;
-	#uploading: boolean = false;
+	private readonly read_size: number;
+	private readonly chunk_size: number;
+	private cancel_cb?: () => void;
+	private uploading: boolean = false;
 
 	/**
 	 * Create a new FileUploader.
@@ -203,9 +205,9 @@ export class FileUploader extends ChunkedUploader {
 		super(options);
 
 		// Default 32 MiB
-		this.#read_size = options.read_size || 33554432;
+		this.read_size = options.read_size || 33554432;
 		// Default 2 MiB
-		this.#chunk_size = options.chunk_size || 2097152;
+		this.chunk_size = options.chunk_size || 2097152;
 	}
 
 	/**
@@ -232,34 +234,34 @@ export class FileUploader extends ChunkedUploader {
 	 * ```
 	 */
 	async upload_file(file: File, on_progress: (progress: number) => void): Promise<void> {
-		this.#uploading = true;
+		this.uploading = true;
 
-		for (let i = 0; i < file.size; i += this.#read_size) {
+		for (let i = 0; i < file.size; i += this.read_size) {
 			await new Promise((resolve, reject) => {
 				// Take a slice of the file with size of our read_size
-				const slice = file.slice(i, i + this.#read_size);
+				const slice = file.slice(i, i + this.read_size);
 
 				const reader = new FileReader();
 				reader.onload = async (e) => {
-					const result = e.target?.result as ArrayBuffer;
+					const result = (e.target as FileReader).result as ArrayBuffer;
 
-					for (let f = 0; f < result.byteLength; f += this.#chunk_size) {
-						if (this.#cancel) {
+					for (let f = 0; f < result.byteLength; f += this.chunk_size) {
+						if (this.cancel_cb) {
 							await this.destroy().catch();
 							reject("CANCELLED");
-							this.#cancel();
+							this.cancel_cb();
 							return;
 						}
 
 						// Take a chunk of the slice with size of our chunk_size
-						const chunk = result.slice(f, f + this.#chunk_size);
+						const chunk = result.slice(f, f + this.chunk_size);
 
 						// Upload the chunk
 						await this.upload(chunk);
 
 						on_progress((i + f) / file.size);
 
-						resolve(null);
+						resolve(undefined);
 					}
 				};
 
@@ -267,7 +269,7 @@ export class FileUploader extends ChunkedUploader {
 			});
 		}
 
-		this.#uploading = false;
+		this.uploading = false;
 	}
 
 	/**
@@ -292,9 +294,9 @@ export class FileUploader extends ChunkedUploader {
 	 */
 	cancel(): Promise<void> {
 		return new Promise((resolve, reject) => {
-			if (!this.#uploading) reject("Not uploading. Have you ran 'upload_file' yet?");
+			if (!this.uploading) reject("Not uploading. Have you ran 'upload_file' yet?");
 
-			this.#cancel = resolve;
+			this.cancel_cb = resolve;
 		});
 	}
 }
@@ -311,12 +313,12 @@ export type FileUploaderQueuedJob = {
 };
 
 export class FileUploaderQueued extends FileUploader {
-	readonly #jobs: { [key: number]: FileUploaderQueuedJob } = {};
-	readonly #queue: number[] = [];
-	#queue_index: number = 0;
+	private readonly jobs: { [key: number]: FileUploaderQueuedJob } = {};
+	private readonly queue: number[] = [];
+	private queue_index: number = 0;
 
-	#running: number = 0;
-	#active: number = -1;
+	private running: number = 0;
+	private active: number = -1;
 
 	/**
 	 * Create a new FileUploaderQueued.
@@ -363,11 +365,11 @@ export class FileUploaderQueued extends FileUploader {
 	 * ```
 	 */
 	add_job(job: FileUploaderQueuedJob): number {
-		const id = this.#queue_index++;
-		this.#jobs[id] = job;
-		this.#queue.push(id);
+		const id = this.queue_index++;
+		this.jobs[id] = job;
+		this.queue.push(id);
 
-		this.#work();
+		this.work();
 
 		return id;
 	}
@@ -385,24 +387,24 @@ export class FileUploaderQueued extends FileUploader {
 	 * ```
 	 */
 	async cancel_job(job_id: number): Promise<void> {
-		if (this.#active === job_id) {
+		if (this.active === job_id) {
 			await this.cancel();
 		} else {
-			if (!this.#jobs[job_id]) throw new Error("Job not found");
+			if (!this.jobs[job_id]) throw new Error("Job not found");
 
-			delete this.#jobs[job_id];
-			this.#queue.splice(this.#queue.indexOf(job_id), 1);
+			delete this.jobs[job_id];
+			this.queue.splice(this.queue.indexOf(job_id), 1);
 		}
 	}
 
-	async #work() {
+	private async work() {
 		// Check if it is not running
-		if (this.#running++ === 0) {
-			// Iterate over the entire queue
-			for (let job_id = this.#queue.shift(); job_id; job_id = this.#queue.shift()) {
-				this.#active = job_id;
-				const job = this.#jobs[job_id];
-				delete this.#jobs[job_id];
+		if (this.running++ === 0) {
+			// Iterate over the entire queue 
+			while (this.queue.length > 0) {
+				this.active = this.queue.shift() as number;
+				const job = this.jobs[this.active];
+				delete this.jobs[this.active];
 
 				await this.begin(job.ext);
 				await this.upload_file(job.file, job.on_progress);
@@ -414,7 +416,7 @@ export class FileUploaderQueued extends FileUploader {
 				job.finally();
 			}
 
-			this.#running = 0;
+			this.running = 0;
 		}
 	}
 }
