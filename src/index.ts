@@ -398,11 +398,11 @@ export class FileUploaderQueued extends FileUploader {
 	private async work() {
 		// Check if it is not running
 		if (this.running++ === 0) {
-			// Iterate over the entire queue
-			for (let job_id = this.queue.shift(); job_id; job_id = this.queue.shift()) {
-				this.active = job_id;
-				const job = this.jobs[job_id];
-				delete this.jobs[job_id];
+			// Iterate over the entire queue 
+			while (this.queue.length > 0) {
+				this.active = this.queue.shift() as number;
+				const job = this.jobs[this.active];
+				delete this.jobs[this.active];
 
 				await this.begin(job.ext);
 				await this.upload_file(job.file, job.on_progress);
