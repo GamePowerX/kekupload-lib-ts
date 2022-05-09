@@ -94,8 +94,8 @@ export class ChunkedUploader {
 	 * ```
 	 */
 	async begin(ext: string): Promise<void> {
-        // Reset the hasher to its initial state
-        this.hasher.reset();
+		// Reset the hasher to its initial state
+		this.hasher.reset();
 		this.stream = (await this.api.create(ext)).stream;
 	}
 
@@ -260,9 +260,9 @@ export class FileUploader extends ChunkedUploader {
 						await this.upload(chunk);
 
 						on_progress((i + f) / file.size);
-
-						resolve(undefined);
 					}
+
+					resolve(undefined);
 				};
 
 				reader.readAsArrayBuffer(slice);
@@ -400,7 +400,7 @@ export class FileUploaderQueued extends FileUploader {
 	private async work() {
 		// Check if it is not running
 		if (this.running++ === 0) {
-			// Iterate over the entire queue 
+			// Iterate over the entire queue
 			while (this.queue.length > 0) {
 				this.active = this.queue.shift() as number;
 				const job = this.jobs[this.active];
