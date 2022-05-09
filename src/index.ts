@@ -246,10 +246,14 @@ export class FileUploader extends ChunkedUploader {
 					const result = (e.target as FileReader).result as ArrayBuffer;
 
 					for (let f = 0; f < result.byteLength; f += this.chunk_size) {
+						on_progress((i + f) / file.size);
+
 						if (this.cancel_cb) {
 							await this.destroy().catch();
 							reject("CANCELLED");
 							this.cancel_cb();
+                            // Reset the cancel callback
+                            this.cancel_cb = undefined;
 							return;
 						}
 
@@ -258,8 +262,6 @@ export class FileUploader extends ChunkedUploader {
 
 						// Upload the chunk
 						await this.upload(chunk);
-
-						on_progress((i + f) / file.size);
 					}
 
 					resolve(undefined);
@@ -406,12 +408,13 @@ export class FileUploaderQueued extends FileUploader {
 				const job = this.jobs[this.active];
 				delete this.jobs[this.active];
 
-				await this.begin(job.ext);
-				await this.upload_file(job.file, job.on_progress);
-
-				try {
-					await this.finish().then(job.then).catch(job.catch);
-				} catch (ignored) {}
+                try {
+                    await this.begin(job.ext);
+                    await this.upload_file(job.file, job.on_progress);
+                    await this.finish().then(job.then);
+                } catch(e) {
+                    job.catch(e);
+                }
 
 				job.finally();
 			}
