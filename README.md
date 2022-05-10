@@ -1,10 +1,10 @@
 # KekUpload lib-ts
 
-![](https://tokei.rs/b1/github/KotwOSS/kekupload-server)
-![](https://tokei.rs/b1/github/KotwOSS/kekupload-server?category=blanks)
-![](https://tokei.rs/b1/github/KotwOSS/kekupload-server?category=code)
-![](https://tokei.rs/b1/github/KotwOSS/kekupload-server?category=comments)
-![](https://tokei.rs/b1/github/KotwOSS/kekupload-server?category=files)
+![](https://tokei.rs/b1/github/KotwOSS/kekupload-lib-ts)
+![](https://tokei.rs/b1/github/KotwOSS/kekupload-lib-ts?category=blanks)
+![](https://tokei.rs/b1/github/KotwOSS/kekupload-lib-ts?category=code)
+![](https://tokei.rs/b1/github/KotwOSS/kekupload-lib-ts?category=comments)
+![](https://tokei.rs/b1/github/KotwOSS/kekupload-lib-ts?category=files)
 
 A library for [kekupload-server](https://oss.kotw.dev/kekupload-server) written in [typescript](https://www.typescriptlang.org/).
 
