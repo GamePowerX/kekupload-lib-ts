@@ -27,12 +27,20 @@ export class KekUploadAPI {
 		this.base = base;
 	}
 
-	async req(method: HttpMethod, path: string, data: ArrayBuffer | null): Promise<any> {
+	async req(
+		method: HttpMethod,
+		path: string,
+		data: ArrayBuffer | null,
+		success: (xmlHttp: XMLHttpRequest) => any,
+		error: (xmlHttp: XMLHttpRequest) => any
+	): Promise<any> {
 		return new Promise((resolve, reject) => {
 			let xmlHttp = new XMLHttpRequest();
 			xmlHttp.onreadystatechange = function () {
 				if (xmlHttp.readyState === 4) {
-					(xmlHttp.status === 200 ? resolve : reject)(JSON.parse(xmlHttp.response));
+					(xmlHttp.status === 200 ? resolve : reject)(
+						xmlHttp.status === 200 ? success(xmlHttp) : error(xmlHttp)
+					);
 				}
 			};
 			xmlHttp.open(method, `${this.base}${path}`, true);
@@ -40,20 +48,36 @@ export class KekUploadAPI {
 		});
 	}
 
+	private handlej(xmlHttp: XMLHttpRequest) {
+		return JSON.parse(xmlHttp.response);
+	}
+
+	private handlet(xmlHttp: XMLHttpRequest) {
+		return xmlHttp.response;
+	}
+
 	async create(ext: string): Promise<{ stream: string }> {
-		return await this.req("POST", `c/${ext}`, null);
+		return await this.req("POST", `c/${ext}`, null, this.handlej, this.handlej);
 	}
 
 	async upload(stream: string, hash: string, chunk: ArrayBuffer): Promise<{ success: boolean }> {
-		return await this.req("POST", `u/${stream}/${hash}`, chunk);
+		return await this.req("POST", `u/${stream}/${hash}`, chunk, this.handlej, this.handlej);
 	}
 
 	async finish(stream: string, hash: string): Promise<{ id: string }> {
-		return await this.req("POST", `f/${stream}/${hash}`, null);
+		return await this.req("POST", `f/${stream}/${hash}`, null, this.handlej, this.handlej);
 	}
 
 	async remove(stream: string): Promise<{ success: boolean }> {
-		return await this.req("POST", `r/${stream}`, null);
+		return await this.req("POST", `r/${stream}`, null, this.handlej, this.handlej);
+	}
+
+	async length(id: string): Promise<{ size: number }> {
+		return await this.req("GET", `l/${id}`, null, this.handlej, this.handlej);
+	}
+
+	async download_chunk(id: string, offset: number, size: number): Promise<ArrayBuffer> {
+		return await this.req("GET", `d/${id}/${offset}/${size}`, null, this.handlet, this.handlej);
 	}
 }
 
@@ -246,10 +270,14 @@ export class FileUploader extends ChunkedUploader {
 					const result = (e.target as FileReader).result as ArrayBuffer;
 
 					for (let f = 0; f < result.byteLength; f += this.chunk_size) {
+						on_progress((i + f) / file.size);
+
 						if (this.cancel_cb) {
 							await this.destroy().catch();
 							reject("CANCELLED");
 							this.cancel_cb();
+							// Reset the cancel callback
+							this.cancel_cb = undefined;
 							return;
 						}
 
@@ -258,8 +286,6 @@ export class FileUploader extends ChunkedUploader {
 
 						// Upload the chunk
 						await this.upload(chunk);
-
-						on_progress((i + f) / file.size);
 					}
 
 					resolve(undefined);
@@ -383,7 +409,7 @@ export class FileUploaderQueued extends FileUploader {
 	 *
 	 * ```typescript
 	 * // Cancel job
-	 * uploader.cancel_job(job_id);
+	 * await uploader.cancel_job(job_id);
 	 * ```
 	 */
 	async cancel_job(job_id: number): Promise<void> {
@@ -406,17 +432,110 @@ export class FileUploaderQueued extends FileUploader {
 				const job = this.jobs[this.active];
 				delete this.jobs[this.active];
 
-				await this.begin(job.ext);
-				await this.upload_file(job.file, job.on_progress);
-
 				try {
-					await this.finish().then(job.then).catch(job.catch);
-				} catch (ignored) {}
+					await this.begin(job.ext);
+					await this.upload_file(job.file, job.on_progress);
+					await this.finish().then(job.then);
+				} catch (e) {
+					job.catch(e);
+				}
 
 				job.finally();
 			}
 
 			this.running = 0;
 		}
+	}
+}
+
+export type ChunkedDownloaderOptions = {
+	api: KekUploadAPI;
+};
+
+export class ChunkedDownloader {
+	private readonly api: KekUploadAPI;
+	private id: string | undefined;
+	private length: number = -1;
+	private offset: number = 0;
+
+	/**
+	 * Create a new ChunkedDownloader.
+	 *
+	 * @param options The options passed to the constructor.
+	 *
+	 * ```typescript
+	 * // Create a new ChunkedDownloader
+	 * const downloader = new ChunkedDownloader({
+	 *     api: new KekUploadAPI("https://u.kotw.dev/api/")
+	 * });
+	 * ```
+	 */
+	constructor(options: ChunkedDownloaderOptions) {
+		this.api = options.api;
+	}
+
+	/**
+	 * Initialize the downloader.
+	 *
+	 * @param id The id of the file to download
+	 *
+	 * ```typescript
+	 * // Initialize the downloader
+	 * await downloader.begin("abcdefg");
+	 * ```
+	 */
+	async begin(id: string) {
+		this.offset = 0;
+		this.length = (await this.api.length(id)).size;
+		this.id = id;
+	}
+
+	/**
+	 * Get the remaining bytes to download.
+	 *
+	 * @returns The remaining bytes to download
+	 *
+	 * ```typescript
+	 * // File 'abcdefg' is 2048 bytes long
+	 *
+	 * // Initialize the downloader
+	 * await downloader.begin("abcdefg");
+	 *
+	 * console.log(downloader.remaining()); // 2048
+	 *
+	 * // Pull some bytes from the downloader
+	 * const chunk = await downloader.pull(1024);
+	 *
+	 * console.log(downloader.remaining()); // 1024
+	 * ```
+	 */
+	remaining(): number {
+		return this.length - this.offset;
+	}
+
+	/**
+	 * Pull some bytes from the downloader. If size is larger than the remaining bytes, it will return an ArrayBuffer with the remaining bytes.
+	 *
+	 * @throws Throws an error if not initialized
+	 *
+	 * @param size The maximum size of the chunk to download
+	 * @returns The chunk with the size `min(remaining, size)`
+	 *
+	 * ```typescript
+	 * // Pull some bytes from the downloader
+	 * const chunk = await downloader.pull(1024);
+	 * ```
+	 */
+	async pull(size: number): Promise<ArrayBuffer> {
+		const remaining = this.remaining();
+		if (size > remaining) size = remaining;
+
+		if (this.id === undefined) throw "Id is undefined. Have you ran 'begin' yet?";
+
+		const buffer = await this.api.download_chunk(this.id, this.offset, size);
+
+		this.offset += size;
+
+		return buffer;
 	}
 }
