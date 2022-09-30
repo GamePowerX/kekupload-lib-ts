@@ -56,7 +56,7 @@ export class KekUploadAPI {
 		return xmlHttp.response;
 	}
 
-	async create(ext: string, name: string | undefined): Promise<{ stream: string }> {
+	async create(ext: string, name?: string): Promise<{ stream: string }> {
 		return await this.req("POST", name ? `c/${encodeURIComponent(ext)}/${encodeURIComponent(name)}` : `c/${encodeURIComponent(ext)}`, null, this.handlej, this.handlej);
 	}
 
@@ -117,7 +117,7 @@ export class ChunkedUploader {
 	 * await uploader.begin("txt");
 	 * ```
 	 */
-	async begin(ext: string, name: string | undefined): Promise<void> {
+	async begin(ext: string, name?: string): Promise<void> {
 		// Reset the hasher to its initial state
 		this.hasher.reset();
 		this.stream = (await this.api.create(ext, name)).stream;
@@ -332,7 +332,7 @@ export type FileUploaderQueuedOptions = FileUploaderOptions & {};
 export type FileUploaderQueuedJob = {
 	file: File;
 	ext: string;
-	name: string | undefined;
+	name?: string;
 	then: (value: { id: string; hash: string }) => void;
 	catch: (err: any) => void;
 	finally: () => void;
