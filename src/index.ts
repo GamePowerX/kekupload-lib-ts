@@ -56,8 +56,8 @@ export class KekUploadAPI {
 		return xmlHttp.response;
 	}
 
-	async create(ext: string): Promise<{ stream: string }> {
-		return await this.req("POST", `c/${ext}`, null, this.handlej, this.handlej);
+	async create(ext: string, name?: string): Promise<{ stream: string }> {
+		return await this.req("POST", name ? `c/${encodeURIComponent(ext)}/${encodeURIComponent(name)}` : `c/${encodeURIComponent(ext)}`, null, this.handlej, this.handlej);
 	}
 
 	async upload(stream: string, hash: string, chunk: ArrayBuffer): Promise<{ success: boolean }> {
@@ -117,10 +117,10 @@ export class ChunkedUploader {
 	 * await uploader.begin("txt");
 	 * ```
 	 */
-	async begin(ext: string): Promise<void> {
+	async begin(ext: string, name?: string): Promise<void> {
 		// Reset the hasher to its initial state
 		this.hasher.reset();
-		this.stream = (await this.api.create(ext)).stream;
+		this.stream = (await this.api.create(ext, name)).stream;
 	}
 
 	/**
@@ -238,7 +238,7 @@ export class FileUploader extends ChunkedUploader {
 	 * Upload the file. You have to run {@link begin} first to initialize the stream.
 	 *
 	 * @param file The file to upload
-	 * @param on_progress A callback which will be called when the upload progressses
+	 * @param on_progress A callback which will be called when the upload progresses
 	 *
 	 * @throws Throws an error if the stream is not initialized
 	 * @throws Throws an error if {@link cancel} was called
@@ -332,6 +332,7 @@ export type FileUploaderQueuedOptions = FileUploaderOptions & {};
 export type FileUploaderQueuedJob = {
 	file: File;
 	ext: string;
+	name?: string;
 	then: (value: { id: string; hash: string }) => void;
 	catch: (err: any) => void;
 	finally: () => void;
@@ -433,7 +434,7 @@ export class FileUploaderQueued extends FileUploader {
 				delete this.jobs[this.active];
 
 				try {
-					await this.begin(job.ext);
+					await this.begin(job.ext, job.name);
 					await this.upload_file(job.file, job.on_progress);
 					await this.finish().then(job.then);
 				} catch (e) {
