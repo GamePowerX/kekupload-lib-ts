@@ -56,14 +56,8 @@ export class KekUploadAPI {
 		return xmlHttp.response;
 	}
 
-	async create(ext: string, name: string): Promise<{ stream: string }> {
-		if(name === "") {
-			console.log("sending create request without name");
-			return await this.req("POST", `c/${ext}`, null, this.handlej, this.handlej);
-		} else {
-			console.log("sending create request with name");
-			return await this.req("POST", `c/${ext}/${name}`, null, this.handlej, this.handlej);
-		}
+	async create(ext: string, name: string | undefined): Promise<{ stream: string }> {
+		return await this.req("POST", name ? `c/${encodeURIComponent(ext)}/${encodeURIComponent(name)}` : `c/${encodeURIComponent(ext)}`, null, this.handlej, this.handlej);
 	}
 
 	async upload(stream: string, hash: string, chunk: ArrayBuffer): Promise<{ success: boolean }> {
@@ -123,7 +117,7 @@ export class ChunkedUploader {
 	 * await uploader.begin("txt");
 	 * ```
 	 */
-	async begin(ext: string, name: string): Promise<void> {
+	async begin(ext: string, name: string | undefined): Promise<void> {
 		// Reset the hasher to its initial state
 		this.hasher.reset();
 		this.stream = (await this.api.create(ext, name)).stream;
@@ -338,8 +332,7 @@ export type FileUploaderQueuedOptions = FileUploaderOptions & {};
 export type FileUploaderQueuedJob = {
 	file: File;
 	ext: string;
-	name: string;
-	withName: boolean;
+	name: string | undefined;
 	then: (value: { id: string; hash: string }) => void;
 	catch: (err: any) => void;
 	finally: () => void;
