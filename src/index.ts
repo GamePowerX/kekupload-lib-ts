@@ -32,7 +32,8 @@ export class KekUploadAPI {
 		path: string,
 		data: ArrayBuffer | null,
 		success: (xmlHttp: XMLHttpRequest) => any,
-		error: (xmlHttp: XMLHttpRequest) => any
+		error: (xmlHttp: XMLHttpRequest) => any,
+		on_progress?: (progress: number) => void
 	): Promise<any> {
 		return new Promise((resolve, reject) => {
 			let xmlHttp = new XMLHttpRequest();
@@ -43,6 +44,10 @@ export class KekUploadAPI {
 					);
 				}
 			};
+			if (on_progress)
+				xmlHttp.addEventListener("progress", function (e) {
+					on_progress(e.loaded / e.total);
+				});
 			xmlHttp.open(method, `${this.base}${path}`, true);
 			xmlHttp.send(data);
 		});
@@ -57,11 +62,31 @@ export class KekUploadAPI {
 	}
 
 	async create(ext: string, name?: string): Promise<{ stream: string }> {
-		return await this.req("POST", name ? `c/${encodeURIComponent(ext)}/${encodeURIComponent(name)}` : `c/${encodeURIComponent(ext)}`, null, this.handlej, this.handlej);
+		return await this.req(
+			"POST",
+			name
+				? `c/${encodeURIComponent(ext)}/${encodeURIComponent(name)}`
+				: `c/${encodeURIComponent(ext)}`,
+			null,
+			this.handlej,
+			this.handlej
+		);
 	}
 
-	async upload(stream: string, hash: string, chunk: ArrayBuffer): Promise<{ success: boolean }> {
-		return await this.req("POST", `u/${stream}/${hash}`, chunk, this.handlej, this.handlej);
+	async upload(
+		stream: string,
+		hash: string,
+		chunk: ArrayBuffer,
+		on_progress?: (progress: number) => void
+	): Promise<{ success: boolean }> {
+		return await this.req(
+			"POST",
+			`u/${stream}/${hash}`,
+			chunk,
+			this.handlej,
+			this.handlej,
+			on_progress
+		);
 	}
 
 	async finish(stream: string, hash: string): Promise<{ id: string }> {
@@ -143,7 +168,7 @@ export class ChunkedUploader {
 	 * console.log(hash);
 	 * ```
 	 */
-	upload(chunk: ArrayBuffer): Promise<string> {
+	upload(chunk: ArrayBuffer, on_progress?: (progress: number) => void): Promise<string> {
 		return new Promise(async (resolve, reject) => {
 			if (this.stream === undefined) reject("Stream not initialized. Have you ran 'begin' yet?");
 
@@ -154,7 +179,7 @@ export class ChunkedUploader {
 			// Try uploading chunk until it succeeds
 			while (true) {
 				try {
-					await this.api.upload(this.stream as string, hash, chunk);
+					await this.api.upload(this.stream as string, hash, chunk, on_progress);
 					break;
 				} catch (e) {}
 			}
