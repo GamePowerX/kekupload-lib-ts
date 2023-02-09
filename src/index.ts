@@ -45,7 +45,7 @@ export class KekUploadAPI {
 				}
 			};
 			if (on_progress)
-				xmlHttp.addEventListener("progress", function (e) {
+				xmlHttp.upload.addEventListener("progress", function (e) {
 					on_progress(e.loaded / e.total);
 				});
 			xmlHttp.open(method, `${this.base}${path}`, true);
