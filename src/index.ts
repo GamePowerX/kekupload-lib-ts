@@ -310,7 +310,9 @@ export class FileUploader extends ChunkedUploader {
 						const chunk = result.slice(f, f + this.chunk_size);
 
 						// Upload the chunk
-						await this.upload(chunk);
+						await this.upload(chunk, (progress: number) => {
+							on_progress((i + f + progress * chunk.byteLength) / file.size);
+						});
 					}
 
 					resolve(undefined);
