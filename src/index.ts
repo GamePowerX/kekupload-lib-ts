@@ -54,7 +54,12 @@ export class KekUploadAPI {
 	}
 
 	private handlej(xmlHttp: XMLHttpRequest) {
-		return JSON.parse(xmlHttp.response);
+		try {
+			return JSON.parse(xmlHttp.response);
+		} catch(e) {
+			// Not valid JSON -> text
+			return xmlHttp.response;
+		}
 	}
 
 	private handlet(xmlHttp: XMLHttpRequest) {
