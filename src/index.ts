@@ -80,18 +80,10 @@ export class KekUploadAPI {
 
 	async upload(
 		stream: string,
-		hash: string,
 		chunk: ArrayBuffer,
 		on_progress?: (progress: number) => void
 	): Promise<{ success: boolean }> {
-		return await this.req(
-			"POST",
-			`u/${stream}/${hash}`,
-			chunk,
-			this.handlej,
-			this.handlej,
-			on_progress
-		);
+		return await this.req("POST", `u/${stream}`, chunk, this.handlej, this.handlej, on_progress);
 	}
 
 	async finish(stream: string, hash: string): Promise<{ id: string }> {
@@ -173,12 +165,11 @@ export class ChunkedUploader {
 	 * console.log(hash);
 	 * ```
 	 */
-	upload(chunk: ArrayBuffer, on_progress?: (progress: number) => void): Promise<string> {
+	upload(chunk: ArrayBuffer, on_progress?: (progress: number) => void): Promise<void> {
 		return new Promise(async (resolve, reject) => {
 			if (this.stream === undefined) reject("Stream not initialized. Have you ran 'begin' yet?");
 
 			const word_array = array_buffer_to_word_array(chunk);
-			const hash = CryptoJS.SHA1(word_array).toString();
 			this.hasher.update(word_array);
 
 			// Try uploading chunk until it succeeds
@@ -187,16 +178,15 @@ export class ChunkedUploader {
 			await new Promise((r) =>
 				this.api.upload(
 					this.stream as string,
-					hash,
 					chunk,
-					(p) => (p ===  1 && r(), on_progress && on_progress(p))
+					(p) => (p === 1 && r(), on_progress && on_progress(p))
 				)
 			);
 			//break;
 			//} catch (e) {}
 			//}
 
-			resolve(hash);
+			resolve();
 		});
 	}
 

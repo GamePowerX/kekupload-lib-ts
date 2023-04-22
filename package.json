@@ -1,6 +1,6 @@
 {
 	"name": "kekupload-lib-ts",
-	"version": "v2.0.2a1",
+	"version": "v2.0.2a2",
 	"description": "KekUpload library written in typescript.",
 	"main": "dist/index",
 	"typings": "dist/index",
