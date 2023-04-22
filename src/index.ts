@@ -56,7 +56,7 @@ export class KekUploadAPI {
 	private handlej(xmlHttp: XMLHttpRequest) {
 		try {
 			return JSON.parse(xmlHttp.response);
-		} catch(e) {
+		} catch (e) {
 			// Not valid JSON -> text
 			return xmlHttp.response;
 		}
@@ -161,7 +161,7 @@ export class ChunkedUploader {
 	 * @throws Throws an error if the stream is not initialized
 	 *
 	 * ```typescript
-	 * const text = "I ❤️ KekUpload";
+	 * const text = "I ❤️  KekUpload";
 	 *
 	 * // Convert string to ArrayBuffer
 	 * const my_chunk = Uint8Array.from(text, x => x.charCodeAt(0));
@@ -182,12 +182,19 @@ export class ChunkedUploader {
 			this.hasher.update(word_array);
 
 			// Try uploading chunk until it succeeds
-			while (true) {
-				try {
-					await this.api.upload(this.stream as string, hash, chunk, on_progress);
-					break;
-				} catch (e) {}
-			}
+			//while (true) {
+			//try {
+			await new Promise((r) =>
+				this.api.upload(
+					this.stream as string,
+					hash,
+					chunk,
+					(p) => (p ===  1 && r(), on_progress && on_progress(p))
+				)
+			);
+			//break;
+			//} catch (e) {}
+			//}
 
 			resolve(hash);
 		});
