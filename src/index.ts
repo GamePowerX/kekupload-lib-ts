@@ -175,18 +175,14 @@ export class ChunkedUploader {
 			// Try uploading chunk until it succeeds
 			//while (true) {
 			//try {
-			await new Promise((r) =>
-				this.api.upload(
-					this.stream as string,
-					chunk,
-					(p) => (p === 1 && r(), on_progress && on_progress(p))
-				)
+			this.api.upload(
+				this.stream as string,
+				chunk,
+				(p) => (p === 1 && resolve(), on_progress && on_progress(p))
 			);
 			//break;
 			//} catch (e) {}
 			//}
-
-			resolve();
 		});
 	}
 
