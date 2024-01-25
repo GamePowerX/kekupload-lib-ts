@@ -111,6 +111,7 @@ export class ChunkedUploader {
 	 * Initialize a stream.
 	 *
 	 * @param ext The file extension
+	 * @param name The file name (optional)
 	 *
 	 * ```typescript
 	 * // Initialize the stream

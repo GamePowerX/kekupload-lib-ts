@@ -1,10 +1,10 @@
 {
 	"name": "kekupload-lib-ts",
-	"version": "v2.0.1alpha0",
+	"version": "v2.0.2alpha4",
 	"description": "KekUpload library written in typescript.",
 	"main": "dist/index",
 	"typings": "dist/index",
-	"author": "KekOnTheWorld <kekontheworld@gmail.com>",
+	"author": "CraftingDragon007 <craftingdragon007@outlook.com>",
 	"license": "MIT",
 	"scripts": {
 		"prepublishOnly": "npm run compile",
@@ -22,11 +22,11 @@
 		"typescript": "^2.9.2"
 	},
 	"bugs": {
-		"url": "https://github.com/KotwOSS/kekupload-lib-ts/issues"
+		"url": "https://github.com/GamePowerX/kekupload-lib-ts/issues"
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/KotwOSS/kekupload-lib-ts/issues.git"
+		"url": "https://github.com/GamePowerX/kekupload-lib-ts/issues.git"
 	},
 	"keywords": [
 		"kekupload",
