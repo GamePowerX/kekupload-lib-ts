@@ -16,7 +16,7 @@
 	},
 	"dependencies": {
 		"crypto-js": "^4.1.1",
-		"prettier": "^2.8.4"
+		"prettier": "^3.2.4"
 	},
 	"devDependencies": {
 		"@types/crypto-js": "^4.1.1",
