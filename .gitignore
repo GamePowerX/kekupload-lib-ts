@@ -1,5 +1,6 @@
 node_modules/
 dist/
 test/
-package-lock.json
 pnpm-lock.yaml
+*lock.*
+!package-lock.json

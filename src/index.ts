@@ -32,7 +32,8 @@ export class KekUploadAPI {
 		path: string,
 		data: ArrayBuffer | null,
 		success: (xmlHttp: XMLHttpRequest) => any,
-		error: (xmlHttp: XMLHttpRequest) => any
+		error: (xmlHttp: XMLHttpRequest) => any,
+		on_progress?: (progress: number) => void
 	): Promise<any> {
 		return new Promise((resolve, reject) => {
 			let xmlHttp = new XMLHttpRequest();
@@ -43,13 +44,22 @@ export class KekUploadAPI {
 					);
 				}
 			};
+			if (on_progress)
+				xmlHttp.upload.addEventListener("progress", function (e) {
+					on_progress(e.loaded / e.total);
+				});
 			xmlHttp.open(method, `${this.base}${path}`, true);
 			xmlHttp.send(data);
 		});
 	}
 
 	private handlej(xmlHttp: XMLHttpRequest) {
-		return JSON.parse(xmlHttp.response);
+		try {
+			return JSON.parse(xmlHttp.response);
+		} catch (e) {
+			// Not valid JSON -> text
+			return xmlHttp.response;
+		}
 	}
 
 	private handlet(xmlHttp: XMLHttpRequest) {
@@ -57,11 +67,23 @@ export class KekUploadAPI {
 	}
 
 	async create(ext: string, name?: string): Promise<{ stream: string }> {
-		return await this.req("POST", name ? `c/${encodeURIComponent(ext)}/${encodeURIComponent(name)}` : `c/${encodeURIComponent(ext)}`, null, this.handlej, this.handlej);
+		return await this.req(
+			"POST",
+			name
+				? `c/${encodeURIComponent(ext)}/${encodeURIComponent(name)}`
+				: `c/${encodeURIComponent(ext)}`,
+			null,
+			this.handlej,
+			this.handlej
+		);
 	}
 
-	async upload(stream: string, hash: string, chunk: ArrayBuffer): Promise<{ success: boolean }> {
-		return await this.req("POST", `u/${stream}/${hash}`, chunk, this.handlej, this.handlej);
+	async upload(
+		stream: string,
+		chunk: ArrayBuffer,
+		on_progress?: (progress: number) => void
+	): Promise<{ success: boolean }> {
+		return await this.req("POST", `u/${stream}`, chunk, this.handlej, this.handlej, on_progress);
 	}
 
 	async finish(stream: string, hash: string): Promise<{ id: string }> {
@@ -132,7 +154,7 @@ export class ChunkedUploader {
 	 * @throws Throws an error if the stream is not initialized
 	 *
 	 * ```typescript
-	 * const text = "I ❤️ KekUpload";
+	 * const text = "I ❤️  KekUpload";
 	 *
 	 * // Convert string to ArrayBuffer
 	 * const my_chunk = Uint8Array.from(text, x => x.charCodeAt(0));
@@ -144,23 +166,24 @@ export class ChunkedUploader {
 	 * console.log(hash);
 	 * ```
 	 */
-	upload(chunk: ArrayBuffer): Promise<string> {
+	upload(chunk: ArrayBuffer, on_progress?: (progress: number) => void): Promise<void> {
 		return new Promise(async (resolve, reject) => {
 			if (this.stream === undefined) reject("Stream not initialized. Have you ran 'begin' yet?");
 
 			const word_array = array_buffer_to_word_array(chunk);
-			const hash = CryptoJS.SHA1(word_array).toString();
 			this.hasher.update(word_array);
 
 			// Try uploading chunk until it succeeds
-			while (true) {
-				try {
-					await this.api.upload(this.stream as string, hash, chunk);
-					break;
-				} catch (e) {}
-			}
-
-			resolve(hash);
+			//while (true) {
+			//try {
+			this.api.upload(
+				this.stream as string,
+				chunk,
+				(p) => (p === 1 && resolve(), on_progress && on_progress(p))
+			);
+			//break;
+			//} catch (e) {}
+			//}
 		});
 	}
 
@@ -286,7 +309,9 @@ export class FileUploader extends ChunkedUploader {
 						const chunk = result.slice(f, f + this.chunk_size);
 
 						// Upload the chunk
-						await this.upload(chunk);
+						await this.upload(chunk, (progress: number) => {
+							on_progress((i + f + progress * chunk.byteLength) / file.size);
+						});
 					}
 
 					resolve(undefined);
