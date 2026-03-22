@@ -33,7 +33,8 @@ export class KekUploadAPI {
 		data: ArrayBuffer | null,
 		success: (xmlHttp: XMLHttpRequest) => any,
 		error: (xmlHttp: XMLHttpRequest) => any,
-		on_progress?: (progress: number) => void
+		on_progress?: (progress: number) => void,
+		responseType?: XMLHttpRequestResponseType
 	): Promise<any> {
 		return new Promise((resolve, reject) => {
 			let xmlHttp = new XMLHttpRequest();
@@ -44,11 +45,15 @@ export class KekUploadAPI {
 					);
 				}
 			};
+			xmlHttp.onerror = function () {
+				reject(new Error("Network error"));
+			};
 			if (on_progress)
 				xmlHttp.upload.addEventListener("progress", function (e) {
-					on_progress(e.loaded / e.total);
+					on_progress(e.total > 0 ? e.loaded / e.total : 0);
 				});
 			xmlHttp.open(method, `${this.base}${path}`, true);
+			if (responseType) xmlHttp.responseType = responseType;
 			xmlHttp.send(data);
 		});
 	}
@@ -99,7 +104,15 @@ export class KekUploadAPI {
 	}
 
 	async download_chunk(id: string, offset: number, size: number): Promise<ArrayBuffer> {
-		return await this.req("GET", `d/${id}/${offset}/${size}`, null, this.handlet, this.handlej);
+		return await this.req(
+			"GET",
+			`d/${id}/${offset}/${size}`,
+			null,
+			this.handlet,
+			this.handlej,
+			undefined,
+			"arraybuffer"
+		);
 	}
 }
 
@@ -166,25 +179,14 @@ export class ChunkedUploader {
 	 * console.log(hash);
 	 * ```
 	 */
-	upload(chunk: ArrayBuffer, on_progress?: (progress: number) => void): Promise<void> {
-		return new Promise(async (resolve, reject) => {
-			if (this.stream === undefined) reject("Stream not initialized. Have you ran 'begin' yet?");
+	async upload(chunk: ArrayBuffer, on_progress?: (progress: number) => void): Promise<void> {
+		if (this.stream === undefined)
+			throw new Error("Stream not initialized. Have you ran 'begin' yet?");
 
-			const word_array = array_buffer_to_word_array(chunk);
-			this.hasher.update(word_array);
+		const word_array = array_buffer_to_word_array(chunk);
+		this.hasher.update(word_array);
 
-			// Try uploading chunk until it succeeds
-			//while (true) {
-			//try {
-			this.api.upload(
-				this.stream as string,
-				chunk,
-				(p) => (p === 1 && resolve(), on_progress && on_progress(p))
-			);
-			//break;
-			//} catch (e) {}
-			//}
-		});
+		await this.api.upload(this.stream as string, chunk, on_progress);
 	}
 
 	/**
