@@ -20,7 +20,7 @@ export class KekUploadAPI {
 	 * @param base The base URL of the KekUpload API
 	 *
 	 * ```typescript
-	 * const api = new KekUploadAPI("https://u.kotw.dev/api/");
+	 * const api = new KekUploadAPI("https://newupload.gamepowerx.com/");
 	 * ```
 	 */
 	constructor(base: string) {
@@ -133,7 +133,7 @@ export class ChunkedUploader {
 	 * ```typescript
 	 * // Create a new ChunkedUploader
 	 * const uploader = new ChunkedUploader({
-	 *     api: new KekUploadAPI("https://u.kotw.dev/api/")
+	 *     api: new KekUploadAPI("https://newupload.gamepowerx.com/")
 	 * });
 	 * ```
 	 */
@@ -247,7 +247,7 @@ export class FileUploader extends ChunkedUploader {
 	 * ```typescript
 	 * // Create a new FileUploader
 	 * const uploader = new FileUploader({
-	 *     api: new KekUploadAPI("https://u.kotw.dev/api/")
+	 *     api: new KekUploadAPI("https://newupload.gamepowerx.com/")
 	 * });
 	 * ```
 	 */
@@ -383,7 +383,7 @@ export class FileUploaderQueued extends FileUploader {
 	 * ```typescript
 	 * // Create a new FileUploaderQueued
 	 * const uploader = new FileUploaderQueued({
-	 *     api: new KekUploadAPI("https://u.kotw.dev/api/")
+	 *     api: new KekUploadAPI("https://newupload.gamepowerx.com/")
 	 * });
 	 * ```
 	 */
@@ -495,7 +495,7 @@ export class ChunkedDownloader {
 	 * ```typescript
 	 * // Create a new ChunkedDownloader
 	 * const downloader = new ChunkedDownloader({
-	 *     api: new KekUploadAPI("https://u.kotw.dev/api/")
+	 *     api: new KekUploadAPI("https://newupload.gamepowerx.com/")
 	 * });
 	 * ```
 	 */
