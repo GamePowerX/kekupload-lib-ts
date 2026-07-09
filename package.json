@@ -20,7 +20,7 @@
 	},
 	"devDependencies": {
 		"@types/crypto-js": "^4.2.2",
-		"typescript": "^6.0.3"
+		"typescript": "^7.0.2"
 	},
 	"bugs": {
 		"url": "https://github.com/GamePowerX/kekupload-lib-ts/issues"
